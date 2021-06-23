@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+		 xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+
+	<groupId>com.hnup.common</groupId>
+	<artifactId>webapi-parent</artifactId>
+	<version>${revision}</version>
+	<modules>
+		<module>webapi-client</module>
+		<module>webapi-model</module>
+		<module>webapi-publish-starter</module>
+		<module>webapi-web</module>
+		<module>webapi-core</module>
+	</modules>
+	<packaging>pom</packaging>
+
+	<parent>
+		<groupId>com.hnup.common</groupId>
+		<artifactId>boot-dependencies</artifactId>
+		<version>4.1.2</version>
+		<relativePath>../boot-dependencies/pom.xml</relativePath>
+	</parent>
+
+	<properties>
+		<revision>3.1.0-20210610</revision>
+		<aspose.version>20.4</aspose.version>
+		<commons-io.version>2.6</commons-io.version>
+	</properties>
+
+
+
+	<dependencyManagement>
+		<dependencies>
+
+			<!-- aspose -->
+			<dependency>
+				<groupId>com.aspose</groupId>
+				<artifactId>aspose-cells</artifactId>
+				<version>${aspose.version}</version>
+			</dependency>
+
+			<dependency>
+				<groupId>com.aspose</groupId>
+				<artifactId>aspose-slides</artifactId>
+				<version>${aspose.version}</version>
+				<classifier>jdk16</classifier>
+			</dependency>
+
+			<dependency>
+				<groupId>com.aspose</groupId>
+				<artifactId>aspose-words</artifactId>
+				<version>${aspose.version}</version>
+				<classifier>jdk16</classifier>
+			</dependency>
+
+			<dependency>
+				<groupId>com.aspose</groupId>
+				<artifactId>aspose-pdf</artifactId>
+				<version>${aspose.version}</version>
+			</dependency>
+
+			<dependency>
+				<groupId>com.aspose</groupId>
+				<artifactId>aspose-imaging</artifactId>
+				<version>${aspose.version}</version>
+				<classifier>jdk16</classifier>
+			</dependency>
+
+			<dependency>
+				<groupId>commons-io</groupId>
+				<artifactId>commons-io</artifactId>
+				<version>${commons-io.version}</version>
+			</dependency>
+
+		</dependencies>
+	</dependencyManagement>
+
+</project>

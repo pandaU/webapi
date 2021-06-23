@@ -1,0 +1,16 @@
+#spring:
+#  application:
+#    name: file
+#  #  profiles:
+#  #    active: sample
+#  cloud:
+#    nacos:
+#      discovery:
+#        server-addr: 10.14.2.27:8848
+#        namespace: 96868845-f3aa-4ddf-9d81-edc4b77647bb
+#      config:
+#        server-addr: 10.14.2.27:8848
+#        namespace: 96868845-f3aa-4ddf-9d81-edc4b77647bb
+#        file-extension: yaml
+#        group: DEFAULT_GROUP
+#        prefix: file

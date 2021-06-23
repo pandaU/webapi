@@ -1,0 +1,18 @@
+spring:
+  application:
+    name: file
+  #  profiles:
+  #    active: sample
+  cloud:
+    nacos:
+      #注册中心配置
+      discovery:
+        server-addr: 10.14.2.27:8848
+        namespace: d3434256-4a8a-47a1-a499-1092bc7f88ef
+        # 配置中心配置
+      config:
+        server-addr: 10.14.2.27:8848
+        namespace: d3434256-4a8a-47a1-a499-1092bc7f88ef
+        file-extension: yaml
+        group: DEFAULT_GROUP
+        prefix: file

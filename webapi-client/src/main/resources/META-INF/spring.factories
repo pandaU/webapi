@@ -1,0 +1,2 @@
+org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
+com.hnup.commom.webapi.client.config.WebApiFeignClientAutoConfiguration
