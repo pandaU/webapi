@@ -11,10 +11,12 @@ import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.support.GenericApplicationContext;
 import org.springframework.util.ReflectionUtils;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.servlet.mvc.method.RequestMappingInfo;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.util.Set;
 
@@ -80,7 +82,15 @@ public class RegisterBean {
         Method[] method_arr = controllerClass.getMethods();
         for (Method method : method_arr) {
             //判断方法上是否有注解RequestMapping
-			RequestMapping annotation = method.getAnnotation(RequestMapping.class);
+			Annotation  annotation = null;
+			Annotation[] annotations = method.getAnnotations();
+			for (Annotation an:annotations) {
+				RequestMapping mapping = an.annotationType().getAnnotation(RequestMapping.class);
+				if (mapping != null){
+					annotation = mapping;
+					break;
+				}
+			}
 			if (annotation != null) {
                 //获取到类的RequestMappingInfo
 				RequestMappingInfo mappingInfo = (RequestMappingInfo) getMappingForMethod.invoke(requestMappingHandlerMapping, method,controllerClass);

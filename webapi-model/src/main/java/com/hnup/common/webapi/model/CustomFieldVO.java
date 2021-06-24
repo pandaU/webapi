@@ -2,6 +2,8 @@ package com.hnup.common.webapi.model;
 
 import lombok.Data;
 
+import java.util.Objects;
+
 /**
  * <p>
  * The type Custom field vo.
@@ -20,4 +22,22 @@ public class CustomFieldVO {
 	 * Type
 	 */
 	private String fieldType;
+
+	/**
+	 * Column
+	 */
+	private String column;
+
+	@Override
+	public boolean equals(Object o) {
+		if (this == o) return true;
+		if (o == null || getClass() != o.getClass()) return false;
+		CustomFieldVO fieldVO = (CustomFieldVO) o;
+		return Objects.equals(fieldName, fieldVO.fieldName);
+	}
+
+	@Override
+	public int hashCode() {
+		return Objects.hash(fieldName);
+	}
 }

@@ -1,23 +1,33 @@
 package com.hnup.common.webapi.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hnup.common.lang.exception.DeclareException;
+import com.hnup.common.webapi.model.CustomFieldVO;
+import com.hnup.common.webapi.model.RegisterVO;
 import com.hnup.common.webapi.model.WebApiVO;
 import com.hnup.common.webapi.repository.dao.WebApiDao;
 import com.hnup.common.webapi.repository.entity.RegisterEntity;
 import com.hnup.common.webapi.repository.entity.WebApiEntity;
 import com.hnup.common.webapi.repository.mapper.RegisterMapper;
+import com.hnup.common.webapi.util.ApplicationContextRegister;
 import com.hnup.common.webapi.util.ClassUtil;
 import com.hnup.common.webapi.util.RegisterBean;
 import com.hnup.common.webapi.util.WebApiClassLoader;
+import javassist.CannotCompileException;
 import javassist.ClassPool;
+import javassist.NotFoundException;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.json.JacksonJsonParser;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
@@ -28,10 +38,8 @@ import javax.servlet.http.HttpServletRequest;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.lang.reflect.Type;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -57,6 +65,7 @@ public class WebApiService implements ApplicationContextAware {
     @Autowired(required = false)
 	private RegisterMapper registerMapper;
 
+
 	private static Pattern pattern = Pattern.compile("\\b(and|exec|insert|select|drop|grant|alter|delete|update|count|chr|mid|master|truncate|char|declare|or)\\b|(\\*|;|\\+|'|%)");
 
 	@Autowired(required = false)
@@ -64,6 +73,67 @@ public class WebApiService implements ApplicationContextAware {
 		this.webApiDao = webApiDao;
 	}
 
+	public WebApiVO sqlApi(String registerApi,String sqlString ,String apiPath,WebApiVO webApiVo) throws Exception {
+		String DTOClassName = null;
+		if (!CollectionUtils.isEmpty(webApiVo.getCustomResponse())){
+			String DTOName = "DTO" +UUID.randomUUID().toString().replace("-","");
+			Map<String, Object> javaBean = ClassUtil.generateJavaBean(DTOName, webApiVo.getCustomResponse(), null);
+			DTOClassName = javaBean.get("beanName").toString();
+			RegisterEntity entity = new RegisterEntity();
+			entity.setBeanName(javaBean.get("beanName").toString());
+			entity.setAppKey(key);
+			entity.setClassBytes((byte[]) javaBean.get("bytes"));
+			entity.insert();
+		}
+		Map<String, Object> map = ClassUtil.generateSQLClass("", null, null, "com.hnup.common.webapi.service.WebApiService", null,webApiVo.getMethod());
+		Class<?> cl = (Class<?>)map.get("class");
+		Object bean = RegisterBean.registerBean(cl.getSimpleName(), cl, ApplicationContextRegister.getApplicationContext());
+		Class<?> aClass = bean.getClass();
+		RegisterBean.controlCenter(aClass, ApplicationContextRegister.getApplicationContext(), 2, null, registerApi);
+		WebApiVO info = new WebApiVO();
+		info.setBeanName(map.get("beanName").toString());
+		info.setApiPath(registerApi);
+		info.setMethodName("action");
+		info.setClassPath(map.get("path").toString());
+		info.setStatus(1);
+		info.setAppKey(key);
+		info.setHandleType(getSqlType(sqlString));
+		info.setSqlStr(sqlString);
+		info.setClassBytes((byte[]) map.get("bytes"));
+		info.setAccessUrl(apiPath);
+		info.setMethod(webApiVo.getMethod());
+		info.setResponseClass(DTOClassName);
+		ObjectMapper mapper = new ObjectMapper();
+		String args =Optional.ofNullable(webApiVo.getRequestArgs()).map(x->{
+			try {
+				return mapper.writeValueAsString(webApiVo.getRequestArgs());
+			} catch (JsonProcessingException e) {
+				e.printStackTrace();
+			}
+			return null;
+		}).orElse(null);
+		String resp =Optional.ofNullable(webApiVo.getCustomResponse()).map(x->{
+			try {
+				return mapper.writeValueAsString(webApiVo.getCustomResponse());
+			} catch (JsonProcessingException e) {
+				e.printStackTrace();
+			}
+			return null;
+		}).orElse(null);
+		info.setRequestArgsStr(args);
+		info.setCustomResponseStr(resp);
+		saveWebApi(info);
+		return info;
+	}
+	public ResponseEntity<?> javaBean(String beanName, RegisterVO registerVO) throws NotFoundException, CannotCompileException, IOException {
+		Map<String, Object> map = ClassUtil.generateJavaBean(beanName, registerVO.getFields(), registerVO.getMethods());
+		RegisterEntity entity = new RegisterEntity();
+		entity.setBeanName(map.get("beanName").toString());
+		entity.setAppKey(key);
+		entity.setClassBytes((byte[]) map.get("bytes"));
+		entity.insert();
+		return ResponseEntity.ok(entity);
+	}
 	public int saveWebApi(WebApiVO webApiVo) {
 		WebApiEntity entity = new WebApiEntity();
 		BeanUtils.copyProperties(webApiVo, entity);
@@ -112,12 +182,6 @@ public class WebApiService implements ApplicationContextAware {
 	}
 
 	public List<Map<String,Object>> doService(HttpServletRequest request) throws IOException {
-		String str = readStr(request.getInputStream());
-		ObjectMapper objectMapper = new ObjectMapper();
-		Map<Object,Object> map = new HashMap<>();
-		if (!StringUtils.isEmpty(str)){
-			map = objectMapper.readValue(str, HashMap.class);
-		}
 		String uri = request.getRequestURI();
 		uri= regUrl(uri);
 		List<WebApiVO> list = list(null, null, uri , key);
@@ -127,15 +191,8 @@ public class WebApiService implements ApplicationContextAware {
 		WebApiVO vo = list.get(0);
 		String sqlStr = vo.getSqlStr();
 		Integer handleType = vo.getHandleType();
-		for (Map.Entry entry : map.entrySet()) {
-			if (StringUtils.isEmpty(entry.getValue().toString())){
-				continue;
-			}
-			if (validateSql(entry.getValue().toString())){
-				throw new DeclareException("参数不合法");
-			}
-			sqlStr = sqlStr.replace("#{" + entry.getKey().toString() + "}", "'"+entry.getValue().toString()+"'");
-		}
+		String argsStr = vo.getRequestArgsStr();
+		sqlStr =  getSql(argsStr,request,sqlStr);
 		List<Map<String,Object>> resp = new ArrayList<>();
 		switch (handleType) {
 			case 1:
@@ -217,7 +274,7 @@ public class WebApiService implements ApplicationContextAware {
              this.applicationContext = applicationContext;
 	}
 
-	private String readStr(ServletInputStream input){
+	private  String readStr(ServletInputStream input){
 		String resp = null;
 		ByteArrayOutputStream outputStream = null;
 		try {
@@ -240,5 +297,96 @@ public class WebApiService implements ApplicationContextAware {
 			}
 		}
 		return resp;
+	}
+	private static Boolean isNumber(String key,List<CustomFieldVO> list){
+		CustomFieldVO fieldVO = new CustomFieldVO();
+		fieldVO.setFieldName(key);
+		int index = -1;
+		String defaultValue = "java.lang.String";
+		Boolean isNumber = false;
+		if((index = list.indexOf(fieldVO)) > -1){
+			CustomFieldVO vo1 = list.get(index);
+			isNumber = !vo1.getFieldType().equals(defaultValue);
+		}
+		return isNumber;
+	}
+
+	private  String getSql(String argsStr,HttpServletRequest request,String sqlStr) throws IOException {
+		ObjectMapper objectMapper = new ObjectMapper();
+		Map<Object,Object> map = new HashMap<>(16);
+		List<CustomFieldVO> args = Optional.ofNullable(argsStr).map(x->{
+			List<CustomFieldVO> fieldVOArrayList = new ArrayList<>();
+			try {
+				List value = objectMapper.readValue(x, List.class);
+				value.forEach(y->{
+					Map<String,String> stringMap = (Map<String,String>)y;
+					CustomFieldVO  fieldVO =  new CustomFieldVO();
+					fieldVO.setColumn(stringMap.get("column"));
+					fieldVO.setFieldName(stringMap.get("fieldName"));
+					fieldVO.setFieldType(stringMap.get("fieldType"));
+					fieldVOArrayList.add(fieldVO);
+				});
+				return fieldVOArrayList;
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+			return null;
+		}).orElse(null);
+		String str = readStr(request.getInputStream());
+		if (!StringUtils.isEmpty(str)){
+			map = objectMapper.readValue(str, HashMap.class);
+		}else {
+			Map<String, String[]> stringMap = request.getParameterMap();
+			for (Map.Entry<String, String[]> e: stringMap.entrySet()) {
+				map.put(e.getKey(),e.getValue().length > 1 ? Arrays.asList(e.getValue()) : e.getValue()[0] );
+			}
+		}
+
+		for (Map.Entry entry : map.entrySet()) {
+			if (StringUtils.isEmpty(entry.getValue().toString())){
+				continue;
+			}
+			if (validateSql(entry.getValue().toString())){
+				throw new DeclareException("参数不合法");
+			}
+			List<String> StringList = new ArrayList<>();
+			if (entry.getValue() instanceof  List) {
+				if (!StringUtils.isEmpty(str)){
+					List<Object> arr = (List<Object>) entry.getValue();
+					StringList = arr.stream().map(x -> {
+						return x.toString();
+					}).collect(Collectors.toList());
+				}else {
+					StringList = (List<String>)entry.getValue();
+				}
+				map.put(entry.getKey(),String.join("','",StringList));
+				if (isNumber(entry.getKey().toString(),args)){
+					map.put(entry.getKey(),String.join(",",StringList));
+				}
+			}
+			if (isNumber(entry.getKey().toString(),args)){
+				sqlStr = sqlStr.replace("#{" + entry.getKey().toString() + "}", entry.getValue().toString());
+			}else {
+				sqlStr = sqlStr.replace("#{" + entry.getKey().toString() + "}", "'"+entry.getValue().toString()+"'");
+			}
+		}
+		return sqlStr;
+	}
+	/**
+	 * 是否含有sql注入，返回true表示含有
+	 * @param sqlStr
+	 * @return
+	 */
+	private Integer getSqlType(String sqlStr){
+		if (sqlStr.contains("select")){
+			return 3;
+		}
+		if (sqlStr.contains("update")){
+			return 2;
+		}
+		if (sqlStr.contains("insert")){
+			return 1;
+		}
+		return 0;
 	}
 }

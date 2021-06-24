@@ -100,7 +100,7 @@ public class WebApiDaoImpl implements WebApiDao {
 		if (key != null && !key.isEmpty()) {
 			qw.eq("app_key", key);
 		}
-		qw.select("access_url,class_bytes,id,bean_name,method_name,api_path,status,class_path,date_format(utime,'%Y-%m-%d %H:%i:%s') as utime,app_key,handle_type,sql_str");
+		qw.select("response_class,method,request_args_str,custom_response_str,access_url,class_bytes,id,bean_name,method_name,api_path,status,class_path,date_format(utime,'%Y-%m-%d %H:%i:%s') as utime,app_key,handle_type,sql_str");
 		return webApiMapper.selectList(qw);
 	}
 

@@ -56,4 +56,16 @@ public class WebApiEntity extends Model<WebApiEntity> {
 
 	@TableField(value = "access_url")
 	private String   accessUrl;
+
+	@TableField(value = "method")
+	private String method;
+
+	@TableField(value = "request_args_str")
+	private String requestArgsStr;
+
+	@TableField(value = "custom_response_str")
+	private String customResponseStr;
+
+	@TableField(value = "response_class")
+	private String responseClass;
 }

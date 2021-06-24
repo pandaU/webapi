@@ -1,8 +1,9 @@
 package com.hnup.common.webapi.publish.controller;
 
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hnup.common.lang.exception.DeclareException;
-import com.hnup.common.webapi.config.PathConfig;
 import com.hnup.common.webapi.model.RegisterVO;
 import com.hnup.common.webapi.model.WebApiVO;
 import com.hnup.common.webapi.publish.response.ResponseFactory;
@@ -17,9 +18,9 @@ import io.swagger.annotations.ApiOperation;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
+import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
 import java.io.IOException;
@@ -28,6 +29,7 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -64,83 +66,16 @@ public class WebApiController {
 		this.webApiService = webApiService;
 	}
 
-	/**
-	 * Register api string.
-	 *
-	 * @param file       the file
-	 * @param methodName the method name
-	 * @param apiMapping the api mapping
-	 * @return the string
-	 * @throws Exception the exception
-	 * @author XieXiongXiong
-	 * @date 2021 -06-15 08:42:25
-	 */
-	//@PostMapping("/registerApi")
-	@ApiOperation(value = "文件类型动态部署")
-	public Object registerApi(@RequestParam("file") MultipartFile file, String methodName, String apiMapping) throws Exception {
-		String fileName = file.getOriginalFilename();
-		if (file.isEmpty() || !fileName.endsWith(PathConfig.JAVA_SUFFIX)) {
-			return "请选择java文件";
-		}
-		if (!StringUtils.hasLength(fileName)) {
-			return "文件名称不合法";
-		}
-		String filePath = PathConfig.EXT_JAVA_DIR;
-		File dest = new File(filePath + fileName);
-		try {
-			file.transferTo(dest);
-			String[] strings = fileName.split("\\.");
-			String apiName = strings[0];
-			String javaPath = apiName + ".class";
-			String name = WebApiClassLoader.getName(filePath + fileName);
-			WebApiClassLoader loader = WebApiClassLoader.loader;
-			/**动态编译*/
-			Boolean compilerResp = ClassUtil.compiler(dest.getAbsolutePath());
-			if (!compilerResp) {
-				return "代码编译失败，请检查代码书写格式";
-			}
-			Class<?> aClass = loader.loadClass(name);
-			final char[] chars = apiName.toCharArray();
-			chars[0] = chars[0] < 91 ? (char) (chars[0] + 32) : chars[0];
-			String apiNameDown = new String(chars);
-			Object bean = RegisterBean.registerBean(apiNameDown, aClass,ApplicationContextRegister.getApplicationContext());
-			Class<?> aClass1 = bean.getClass();
-			final RestController annotation = aClass1.getAnnotation(RestController.class);
-			if (annotation == null) {
-				return "发布失败,请确保类上有@RestController";
-			}
-			RegisterBean.controlCenter(aClass1, ApplicationContextRegister.getApplicationContext(), 2, methodName, apiMapping);
-			//// TODO: 2021/6/11  将发布信息存储到mysql 便于后期维护管理
-			List<WebApiVO> list = webApiService.list(apiNameDown, methodName, null,key);
-			WebApiVO info = new WebApiVO();
-			info.setBeanName(apiNameDown);
-			info.setApiPath(apiMapping);
-			info.setMethodName(methodName);
-			info.setClassPath(filePath + javaPath);
-			info.setStatus(1);
-			if (list.size() > 0) {
-				final Long id = list.get(0).getId();
-				info.setId(id);
-				info.setUtime(threadLocal.get().format(new Date()));
-				if (!apiMapping.equals(list.get(0).getApiPath())) {
-					RegisterBean.controlCenter(aClass1, ApplicationContextRegister.getApplicationContext(), 3, methodName, list.get(0).getApiPath());
-				}
-				webApiService.upById(info);
-			} else {
-				webApiService.saveWebApi(info);
-			}
-			return "发布成功";
-		} catch (IOException e) {
-		}
-		return "发布失败,请确保方法上有@RequestMapping";
-	}
 
 	@PostMapping("registerSqlApi")
 	@ApiOperation(value = "sql类型动态部署")
 	public ResponseEntity<?> registerSqlApi(@RequestBody WebApiVO webApiVo) {
+		webApiVo.setMethod(Optional.ofNullable(webApiVo.getMethod()).map(x->{
+			return webApiVo.getMethod().toLowerCase();
+		}).orElse("get"));
 		String sqlString = webApiVo.getSqlStr();
 		String apiPath = webApiVo.getApiPath();
-		if (StringUtils.isEmpty(sqlString) || StringUtils.isEmpty(apiPath)){
+		if (StringUtils.isEmpty(sqlString) || StringUtils.isEmpty(apiPath) || CollectionUtils.isEmpty(webApiVo.getRequestArgs())){
 			throw new DeclareException("参数不合法");
 		}
 		if (validateSql(sqlString)){
@@ -155,29 +90,12 @@ public class WebApiController {
 			apiPath = ApplicationContextRegister.getEnablePrefix(defaultPackage) + "/" + apiPath;
 		}
 		List<WebApiVO> webApiVos = webApiService.list(null, null, apiPath, key);
-		final List<String> apiPaths = webApiVos.stream().map(WebApiVO::getApiPath).collect(Collectors.toList());
+		final List<String> apiPaths = webApiVos.stream().map(WebApiVO::getAccessUrl).collect(Collectors.toList());
 		if (iocMappings.contains(apiPath) || apiPaths.contains(apiPath)){
 			throw  new DeclareException("当前apiPath被占用");
 		}
 		try {
-			Map<String, Object> map = ClassUtil.generateSQLClass("", null, null, "com.hnup.common.webapi.service.WebApiService", null);
-			Class<?> cl = (Class<?>)map.get("class");
-			Object bean = RegisterBean.registerBean(cl.getSimpleName(), cl,ApplicationContextRegister.getApplicationContext());
-			Class<?> aClass = bean.getClass();
-			RegisterBean.controlCenter(aClass, ApplicationContextRegister.getApplicationContext(), 2, null, registerApi);
-			WebApiVO info = new WebApiVO();
-			info.setBeanName(map.get("beanName").toString());
-			info.setApiPath(registerApi);
-			info.setMethodName("action");
-			info.setClassPath(map.get("path").toString());
-			info.setStatus(1);
-			info.setAppKey(key);
-			info.setHandleType(getSqlType(sqlString));
-			info.setSqlStr(sqlString);
-			info.setClassBytes((byte[]) map.get("bytes"));
-			info.setAccessUrl(apiPath);
-			webApiService.saveWebApi(info);
-			return ResponseFactory.builder().api(info).build().get();
+			return ResponseFactory.builder().api(webApiService.sqlApi(registerApi,sqlString,apiPath,webApiVo)).build().get();
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -198,14 +116,7 @@ public class WebApiController {
 			throw new DeclareException(beanName + "类已存在");
 		}
 		try {
-			Map<String, Object> map = ClassUtil.generateJavaBean(beanName, registerVO.getFields(), registerVO.getMethods());
-			Class<?> cl = (Class<?>)map.get("class");
-			RegisterEntity entity = new RegisterEntity();
-			entity.setBeanName(map.get("beanName").toString());
-			entity.setAppKey(key);
-			entity.setClassBytes((byte[]) map.get("bytes"));
-			entity.insert();
-			return ResponseEntity.ok(entity);
+			return webApiService.javaBean(beanName,registerVO);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -263,21 +174,4 @@ public class WebApiController {
 		return pattern.matcher(sqlStr).find();
 	}
 
-	/**
-	 * 是否含有sql注入，返回true表示含有
-	 * @param sqlStr
-	 * @return
-	 */
-	private Integer getSqlType(String sqlStr){
-		if (sqlStr.contains("select")){
-			return 3;
-		}
-		if (sqlStr.contains("update")){
-			return 2;
-		}
-		if (sqlStr.contains("insert")){
-			return 1;
-		}
-		return 0;
-	}
 }

@@ -10,6 +10,7 @@ import javassist.bytecode.annotation.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 
 import javax.annotation.PostConstruct;
@@ -55,7 +56,7 @@ public class ClassUtil {
 		return run == 0;
 	}
 
-	public static Map<String, Object> generateSQLClass(String apiPath, String className, String methodName, String fieldType, String fieldName) throws NotFoundException, CannotCompileException {
+	public static Map<String, Object> generateSQLClass(String apiPath, String className, String methodName, String fieldType, String fieldName, String methodType) throws NotFoundException, CannotCompileException {
 		if (StringUtils.isEmpty(className)) {
 			className = defaultPackage + PathConfig.DEFAULT_CLASS_NAME;
 		}
@@ -100,7 +101,7 @@ public class ClassUtil {
 			// 类附上注解
 			AnnotationsAttribute classAttr = new AnnotationsAttribute(constpool, AnnotationsAttribute.visibleTag);
 			Annotation controller = new Annotation("org.springframework.web.bind.annotation.RestController", constpool);
-			Annotation requestMapping = new Annotation("org.springframework.web.bind.annotation.RequestMapping", constpool);
+			Annotation requestMapping = new Annotation(getMethods(methodType), constpool);
 			classAttr.addAnnotation(controller);
 			ccFile.addAttribute(classAttr);
 
@@ -291,37 +292,39 @@ public class ClassUtil {
 					throw new DeclareException("类编译失败");
 				}
 			});
-			extraMethods.forEach(x -> {
-				CtClass type = null;
-				try {
-					type = x.getReturnType() != null ? (ctClass.get(x.getReturnType()) != null ? ctClass.get(x.getReturnType()) : pool.get(x.getReturnType())) : null;
-				} catch (NotFoundException e) {
-					e.printStackTrace();
-				}
-				List<String> list = x.getArgsType();
-				CtClass[] classes = new CtClass[list.size()];
-				list.forEach(y -> {
-					int index = list.indexOf(y);
-					CtClass args = null;
+			if (!CollectionUtils.isEmpty(extraMethods)){
+				extraMethods.forEach(x -> {
+					CtClass type = null;
 					try {
-						args = ctClass.get(y) != null ? ctClass.get(y) : pool.get(y);
+						type = x.getReturnType() != null ? (ctClass.get(x.getReturnType()) != null ? ctClass.get(x.getReturnType()) : pool.get(x.getReturnType())) : null;
 					} catch (NotFoundException e) {
 						e.printStackTrace();
 					}
-					classes[index] = args;
+					List<String> list = x.getArgsType();
+					CtClass[] classes = new CtClass[list.size()];
+					list.forEach(y -> {
+						int index = list.indexOf(y);
+						CtClass args = null;
+						try {
+							args = ctClass.get(y) != null ? ctClass.get(y) : pool.get(y);
+						} catch (NotFoundException e) {
+							e.printStackTrace();
+						}
+						classes[index] = args;
+					});
+					String method = x.getMethodName();
+					CtMethod addMethod = new CtMethod(type, method, classes, clazz);
+					addMethod.setModifiers(java.lang.reflect.Modifier.PUBLIC);
+					StringBuffer sb = new StringBuffer();
+					sb.append(x.getBody());
+					try {
+						addMethod.setBody(sb.toString());
+						clazz.addMethod(addMethod);
+					} catch (CannotCompileException e) {
+						throw new DeclareException("类编译失败");
+					}
 				});
-				String method = x.getMethodName();
-				CtMethod addMethod = new CtMethod(type, method, classes, clazz);
-				addMethod.setModifiers(java.lang.reflect.Modifier.PUBLIC);
-				StringBuffer sb = new StringBuffer();
-				sb.append(x.getBody());
-				try {
-					addMethod.setBody(sb.toString());
-					clazz.addMethod(addMethod);
-				} catch (CannotCompileException e) {
-					throw new DeclareException("类编译失败");
-				}
-			});
+			}
 			HashMap<String, Object> map = new HashMap<>();
 			map.put("class", clazz.toClass());
 			map.put("bytes", clazz.toBytecode());
@@ -367,6 +370,22 @@ public class ClassUtil {
 			return ct;
 		}));
 		return map;
+	}
+
+	private static String getMethods(String method) {
+		method = StringUtils.isEmpty(method) ? "get" : method;
+		String str = null;
+		switch (method) {
+			case "put":
+				str = "org.springframework.web.bind.annotation.PutMapping";
+				break;
+			case "post":
+				str = "org.springframework.web.bind.annotation.PostMapping";
+				break;
+			default:
+				str = "org.springframework.web.bind.annotation.GetMapping";
+		}
+		return str;
 	}
 
 }

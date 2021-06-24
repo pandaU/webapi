@@ -3,6 +3,7 @@ package com.hnup.common.webapi.model;
 import lombok.Data;
 
 import java.io.Serializable;
+import java.util.List;
 
 /**
  * <p>
@@ -67,14 +68,21 @@ public class WebApiVO implements Serializable {
 
 	private String   accessUrl;
 
-	/**
-	 * 以下是api接口接收属性
-	 */
 	private String serviceType;
 
-	private String returnType;
+	private List<CustomFieldVO> customResponse;
+
+	private List<CustomFieldVO> requestArgs;
+
+	private String requestArgsStr;
+
+	private String customResponseStr;
+
+	private String method;
 
 	private String argsType;
 
 	private String methodBody;
+
+	private String responseClass;
 }
