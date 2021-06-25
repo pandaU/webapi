@@ -2,6 +2,7 @@ package com.hnup.common.webapi.web;
 
 import com.hnup.common.webapi.util.ApplicationContextRegister;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -35,5 +36,14 @@ public class TestController {
 			}
 		}
 		return urls;
+	}
+	@RequestMapping("demo/{id}")
+	public Object demo1(@PathVariable("id")Long id){
+              return  "demo1：" + id;
+	}
+
+	@RequestMapping("demo/{id1}")
+	public Object demo2(@PathVariable("id1")String id1){
+		return  "demo2：" + id1;
 	}
 }

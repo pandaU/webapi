@@ -2,17 +2,17 @@ package com.hnup.common.webapi.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hnup.common.lang.exception.DeclareException;
+import com.hnup.common.webapi.config.PathConfig;
 import com.hnup.common.webapi.model.CustomFieldVO;
+import com.hnup.common.webapi.model.JavaBeanDTO;
 import com.hnup.common.webapi.model.RegisterVO;
 import com.hnup.common.webapi.model.WebApiVO;
 import com.hnup.common.webapi.repository.dao.WebApiDao;
-import com.hnup.common.webapi.repository.entity.RegisterEntity;
+import com.hnup.common.webapi.repository.entity.JavaBeanEntity;
 import com.hnup.common.webapi.repository.entity.WebApiEntity;
-import com.hnup.common.webapi.repository.mapper.RegisterMapper;
+import com.hnup.common.webapi.repository.mapper.JavaBeanMapper;
 import com.hnup.common.webapi.util.ApplicationContextRegister;
 import com.hnup.common.webapi.util.ClassUtil;
 import com.hnup.common.webapi.util.RegisterBean;
@@ -24,11 +24,11 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.json.JacksonJsonParser;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 
@@ -38,7 +38,7 @@ import javax.servlet.http.HttpServletRequest;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.lang.reflect.Type;
+import java.lang.reflect.Field;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -62,24 +62,24 @@ public class WebApiService implements ApplicationContextAware {
 
 	private ApplicationContext applicationContext;
 
-    @Autowired(required = false)
-	private RegisterMapper registerMapper;
+    private final JavaBeanService javaBeanService;
 
 
 	private static Pattern pattern = Pattern.compile("\\b(and|exec|insert|select|drop|grant|alter|delete|update|count|chr|mid|master|truncate|char|declare|or)\\b|(\\*|;|\\+|'|%)");
 
 	@Autowired(required = false)
-	public WebApiService(WebApiDao webApiDao) {
+	public WebApiService(WebApiDao webApiDao, JavaBeanService javaBeanService) {
 		this.webApiDao = webApiDao;
+		this.javaBeanService = javaBeanService;
 	}
-
+	@Transactional
 	public WebApiVO sqlApi(String registerApi,String sqlString ,String apiPath,WebApiVO webApiVo) throws Exception {
 		String DTOClassName = null;
 		if (!CollectionUtils.isEmpty(webApiVo.getCustomResponse())){
-			String DTOName = "DTO" +UUID.randomUUID().toString().replace("-","");
+			String DTOName = ClassUtil.getClassName(PathConfig.DEFAULT_JAVA_BEAN_TYPE);
 			Map<String, Object> javaBean = ClassUtil.generateJavaBean(DTOName, webApiVo.getCustomResponse(), null);
 			DTOClassName = javaBean.get("beanName").toString();
-			RegisterEntity entity = new RegisterEntity();
+			JavaBeanEntity entity = new JavaBeanEntity();
 			entity.setBeanName(javaBean.get("beanName").toString());
 			entity.setAppKey(key);
 			entity.setClassBytes((byte[]) javaBean.get("bytes"));
@@ -103,22 +103,21 @@ public class WebApiService implements ApplicationContextAware {
 		info.setAccessUrl(apiPath);
 		info.setMethod(webApiVo.getMethod());
 		info.setResponseClass(DTOClassName);
+		info.setReturnType(webApiVo.getReturnType());
 		ObjectMapper mapper = new ObjectMapper();
 		String args =Optional.ofNullable(webApiVo.getRequestArgs()).map(x->{
 			try {
 				return mapper.writeValueAsString(webApiVo.getRequestArgs());
 			} catch (JsonProcessingException e) {
-				e.printStackTrace();
+				throw new DeclareException();
 			}
-			return null;
 		}).orElse(null);
 		String resp =Optional.ofNullable(webApiVo.getCustomResponse()).map(x->{
 			try {
 				return mapper.writeValueAsString(webApiVo.getCustomResponse());
 			} catch (JsonProcessingException e) {
-				e.printStackTrace();
+				throw new DeclareException();
 			}
-			return null;
 		}).orElse(null);
 		info.setRequestArgsStr(args);
 		info.setCustomResponseStr(resp);
@@ -127,7 +126,7 @@ public class WebApiService implements ApplicationContextAware {
 	}
 	public ResponseEntity<?> javaBean(String beanName, RegisterVO registerVO) throws NotFoundException, CannotCompileException, IOException {
 		Map<String, Object> map = ClassUtil.generateJavaBean(beanName, registerVO.getFields(), registerVO.getMethods());
-		RegisterEntity entity = new RegisterEntity();
+		JavaBeanEntity entity = new JavaBeanEntity();
 		entity.setBeanName(map.get("beanName").toString());
 		entity.setAppKey(key);
 		entity.setClassBytes((byte[]) map.get("bytes"));
@@ -153,8 +152,8 @@ public class WebApiService implements ApplicationContextAware {
 		return webApiDao.upById(entity);
 	}
 
-	public List<WebApiVO> list(String beanName, String methodName, String apiMapping, String key) {
-		List<WebApiEntity> list = webApiDao.list(beanName, methodName, apiMapping , key);
+	public List<WebApiVO> list(String responseClass, String method, String apiMapping, String key) {
+		List<WebApiEntity> list = webApiDao.list(responseClass, method, apiMapping , key);
 		List<WebApiVO> apiVos = list.stream().map(entity -> {
 			WebApiVO vo = new WebApiVO();
 			BeanUtils.copyProperties(entity, vo);
@@ -181,7 +180,7 @@ public class WebApiService implements ApplicationContextAware {
 		return webApiDao.insertBySql(sqlStr);
 	}
 
-	public List<Map<String,Object>> doService(HttpServletRequest request) throws IOException {
+	public Object doService(HttpServletRequest request) throws IOException, IllegalAccessException, InstantiationException, ClassNotFoundException {
 		String uri = request.getRequestURI();
 		uri= regUrl(uri);
 		List<WebApiVO> list = list(null, null, uri , key);
@@ -190,6 +189,9 @@ public class WebApiService implements ApplicationContextAware {
 		}
 		WebApiVO vo = list.get(0);
 		String sqlStr = vo.getSqlStr();
+		String returnType = vo.getReturnType();
+		String returnClass = vo.getResponseClass();
+		List<CustomFieldVO> customResponse = ClassUtil.jsonToArray(vo.getCustomResponseStr());
 		Integer handleType = vo.getHandleType();
 		String argsStr = vo.getRequestArgsStr();
 		sqlStr =  getSql(argsStr,request,sqlStr);
@@ -207,7 +209,7 @@ public class WebApiService implements ApplicationContextAware {
 			default:
 				throw new DeclareException("未找到执行的sql");
 		}
-		return resp;
+		return CollectionUtils.isEmpty(customResponse) ? resp : returnBody(resp,returnType,returnClass,customResponse);
 	}
 
 	public List<Map<String,Object>> listBySqlReturnMap(String sqlStr) {
@@ -234,9 +236,7 @@ public class WebApiService implements ApplicationContextAware {
 		ClassPool pool = ClassUtil.pool;
 		WebApiClassLoader loader = WebApiClassLoader.loader;
 
-		QueryWrapper<RegisterEntity> wrapper = new QueryWrapper<>();
-		wrapper.eq("app_key",key).select("bean_name as beanName,class_bytes as classBytes");
-		List<RegisterEntity> list1 = registerMapper.selectList(wrapper);
+		List<JavaBeanDTO> list1 = javaBeanService.list(null, key);
 		list1.forEach(x->{
 			String beanName = x.getBeanName();
 			byte[] bytes = x.getClassBytes();
@@ -314,24 +314,7 @@ public class WebApiService implements ApplicationContextAware {
 	private  String getSql(String argsStr,HttpServletRequest request,String sqlStr) throws IOException {
 		ObjectMapper objectMapper = new ObjectMapper();
 		Map<Object,Object> map = new HashMap<>(16);
-		List<CustomFieldVO> args = Optional.ofNullable(argsStr).map(x->{
-			List<CustomFieldVO> fieldVOArrayList = new ArrayList<>();
-			try {
-				List value = objectMapper.readValue(x, List.class);
-				value.forEach(y->{
-					Map<String,String> stringMap = (Map<String,String>)y;
-					CustomFieldVO  fieldVO =  new CustomFieldVO();
-					fieldVO.setColumn(stringMap.get("column"));
-					fieldVO.setFieldName(stringMap.get("fieldName"));
-					fieldVO.setFieldType(stringMap.get("fieldType"));
-					fieldVOArrayList.add(fieldVO);
-				});
-				return fieldVOArrayList;
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
-			return null;
-		}).orElse(null);
+		List<CustomFieldVO> args = ClassUtil.jsonToArray(argsStr);
 		String str = readStr(request.getInputStream());
 		if (!StringUtils.isEmpty(str)){
 			map = objectMapper.readValue(str, HashMap.class);
@@ -378,15 +361,68 @@ public class WebApiService implements ApplicationContextAware {
 	 * @return
 	 */
 	private Integer getSqlType(String sqlStr){
-		if (sqlStr.contains("select")){
+		sqlStr = sqlStr.toLowerCase();
+		if (sqlStr.contains(PathConfig.SELECT)){
 			return 3;
 		}
-		if (sqlStr.contains("update")){
+		if (sqlStr.contains(PathConfig.UPDATE)){
 			return 2;
 		}
-		if (sqlStr.contains("insert")){
+		if (sqlStr.contains(PathConfig.INSERT)){
 			return 1;
 		}
 		return 0;
+	}
+
+	private Object returnBody(List<Map<String, Object>> maps,String returnType,String returnClass,List<CustomFieldVO> customResponse) throws ClassNotFoundException, IllegalAccessException, InstantiationException {
+		returnType =  Optional.ofNullable(returnType).map(String::toLowerCase).orElse("list");
+		WebApiClassLoader loader =WebApiClassLoader.loader;
+		Class<?> aClass = Class.forName(returnClass, true, loader);
+		Object obj = null;
+		switch (returnType){
+			case "long":
+				obj =  1;
+				break;
+			case "object":
+				Object instance = aClass.newInstance();
+				if (!CollectionUtils.isEmpty(maps)){
+					Map<String, Object> objectMap = (Map<String, Object>)maps.get(0);
+					fieldCopy(objectMap,instance,customResponse);
+				}
+				obj =  instance;
+				break;
+			case "list":
+				List<Map<String, Object>> objectMaps = (List<Map<String, Object>>)maps;
+				List list =new ArrayList();
+				maps.forEach(x->{
+					try {
+						Object dto = aClass.newInstance();
+						fieldCopy(x,dto,customResponse);
+						list.add(dto);
+					} catch (InstantiationException e) {
+						e.printStackTrace();
+					} catch (IllegalAccessException e) {
+						e.printStackTrace();
+					}
+				});
+				obj = list;
+				break;
+			default:
+				throw new DeclareException();
+
+		}
+		return obj;
+	}
+	private void fieldCopy(Map<String, Object> objectMap,Object instance,List<CustomFieldVO> customResponse){
+		Class aClass =instance.getClass();
+		customResponse.forEach(x->{
+			try {
+				Field field = aClass.getDeclaredField(x.getFieldName());
+				field.setAccessible(true);
+				field.set(instance,objectMap.get(x.getColumn()));
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		});
 	}
 }

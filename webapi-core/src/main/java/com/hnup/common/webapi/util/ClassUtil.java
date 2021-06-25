@@ -1,5 +1,7 @@
 package com.hnup.common.webapi.util;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hnup.common.lang.exception.DeclareException;
 import com.hnup.common.webapi.config.PathConfig;
 import com.hnup.common.webapi.model.CustomFieldVO;
@@ -31,6 +33,8 @@ import java.util.stream.Stream;
  */
 @Component
 public class ClassUtil {
+	private final static ObjectMapper mapper =new ObjectMapper();
+
 	public static ClassPool pool = ClassPool.getDefault();
 
 	private static String defaultPackage;
@@ -58,7 +62,7 @@ public class ClassUtil {
 
 	public static Map<String, Object> generateSQLClass(String apiPath, String className, String methodName, String fieldType, String fieldName, String methodType) throws NotFoundException, CannotCompileException {
 		if (StringUtils.isEmpty(className)) {
-			className = defaultPackage + PathConfig.DEFAULT_CLASS_NAME;
+			className = defaultPackage + getClassName(null);
 		}
 		if (StringUtils.isEmpty(methodName)) {
 			methodName = PathConfig.DEFAULT_CLASS_METHOD;
@@ -67,7 +71,7 @@ public class ClassUtil {
 		try {
 			//切换classLoad
 			Thread.currentThread().setContextClassLoader(WebApiClassLoader.loader);
-			String destName = className + UUID.randomUUID().toString().replace("-", "");
+			String destName = className;
 			CtClass clazz = pool.makeClass(destName);
 			ClassFile ccFile = clazz.getClassFile();
 			ConstPool constpool = ccFile.getConstPool();
@@ -153,7 +157,7 @@ public class ClassUtil {
 
 	public static Map<String, Object> generateApiClass(String apiPath, String className, String methodName, String fieldType, String fieldName, String body, String argsType) throws NotFoundException, CannotCompileException {
 		if (StringUtils.isEmpty(className)) {
-			className = defaultPackage + PathConfig.DEFAULT_CLASS_NAME;
+			className = defaultPackage + getClassName(null);
 		}
 		if (StringUtils.isEmpty(methodName)) {
 			methodName = PathConfig.DEFAULT_CLASS_METHOD;
@@ -247,12 +251,14 @@ public class ClassUtil {
 
 	public static Map<String, Object> generateJavaBean(String beanName, List<CustomFieldVO> fields, List<CustomMethodVO> extraMethods) throws IOException, CannotCompileException, NotFoundException {
 		Map<String, CtClass> ctClass = classMap;
-		String destName = defaultPackage + "." + beanName;
+		String destName = defaultPackage + beanName;
 		ClassLoader loader = pool.getClassLoader();
 		try {
 			//切换classLoad
 			Thread.currentThread().setContextClassLoader(WebApiClassLoader.loader);
 			CtClass clazz = pool.makeClass(destName);
+			ClassFile ccFile = clazz.getClassFile();
+			ConstPool constpool = ccFile.getConstPool();
 			clazz.setSuperclass(pool.get("java.lang.Object"));
 			fields.forEach((x) -> {
 				String name = x.getFieldName();
@@ -269,9 +275,16 @@ public class ClassUtil {
 				try {
 					CtField field = new CtField(type, name, clazz);
 					field.setModifiers(Modifier.PRIVATE);
+					FieldInfo fieldInfo = field.getFieldInfo();
+					// 属性附上注解
+					/*AnnotationsAttribute fieldAttr = new AnnotationsAttribute(constpool, AnnotationsAttribute.visibleTag);
+					Annotation jsonProperty = new Annotation("com.fasterxml.jackson.annotation.JsonProperty", constpool);
+					jsonProperty.addMemberValue("value",new StringMemberValue(name,constpool));
+					fieldAttr.addAnnotation(jsonProperty);
+					fieldInfo.addAttribute(fieldAttr);*/
 					clazz.addField(field);
 					final char[] chars = name.toCharArray();
-					chars[0] = chars[0] > 91 ? (char) (chars[0] - 32) : chars[0];
+					chars[0] = chars[0] >91 && chars[1] > 91 ? (char) (chars[0] - 32) : chars[0];
 					String setMethod = "set" + new String(chars);
 					// 增加get/set方法，javassist可以直接将字符串set到方法体中，所以使用时非常方便
 					CtMethod set = new CtMethod(clazz, setMethod, new CtClass[]{type}, clazz);
@@ -388,4 +401,29 @@ public class ClassUtil {
 		return str;
 	}
 
+	public static String getClassName(String type){
+		return  Optional.ofNullable(type).
+			map(x->{ return x.equals(PathConfig.DEFAULT_JAVA_BEAN_TYPE) ? PathConfig.DEFAULT_DTO_CLASS_NAME  : PathConfig.DEFAULT_CLASS_NAME;})
+			.orElse(PathConfig.DEFAULT_CLASS_NAME) + UUID.randomUUID().toString().replace("-","");
+	}
+	public static List<CustomFieldVO> jsonToArray(String json){
+		return  Optional.ofNullable(json).map(x -> {
+			List<CustomFieldVO> fieldVOArrayList = new ArrayList<>();
+			try {
+				List value = mapper.readValue(x, List.class);
+				value.forEach(y->{
+					Map<String,String> stringMap = (Map<String,String>)y;
+					CustomFieldVO  fieldVO =  new CustomFieldVO();
+					fieldVO.setColumn(stringMap.get("column"));
+					fieldVO.setFieldName(stringMap.get("fieldName"));
+					fieldVO.setFieldType(stringMap.get("fieldType"));
+					fieldVOArrayList.add(fieldVO);
+				});
+				return fieldVOArrayList;
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+			return null;
+		}).orElse(null);
+	}
 }

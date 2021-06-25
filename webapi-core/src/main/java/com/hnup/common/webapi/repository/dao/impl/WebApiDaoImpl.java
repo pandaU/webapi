@@ -78,21 +78,21 @@ public class WebApiDaoImpl implements WebApiDao {
 	/**
 	 * List list.
 	 *
-	 * @param beanName   the bean name
-	 * @param methodName the method name
+	 * @param responseClass   the bean name
+	 * @param method the method name
 	 * @param apiMapping the api mapping
 	 * @return the list
 	 * @author XieXiongXiong
 	 * @date 2021 -06-18 10:25:54
 	 */
 	@Override
-	public List<WebApiEntity> list(String beanName, String methodName, String apiMapping, String key) {
+	public List<WebApiEntity> list(String responseClass, String method, String apiMapping, String key) {
 		QueryWrapper<WebApiEntity> qw = new QueryWrapper<>();
-		if (beanName != null && !beanName.isEmpty()) {
-			qw.eq("bean_name", beanName);
+		if (responseClass != null && !responseClass.isEmpty()) {
+			qw.eq("response_class", responseClass);
 		}
-		if (methodName != null && !methodName.isEmpty()) {
-			qw.eq("method_name", methodName);
+		if (method != null && !method.isEmpty()) {
+			qw.eq("method", method);
 		}
 		if (apiMapping != null && !apiMapping.isEmpty()) {
 			qw.eq("access_url", apiMapping);
@@ -100,7 +100,8 @@ public class WebApiDaoImpl implements WebApiDao {
 		if (key != null && !key.isEmpty()) {
 			qw.eq("app_key", key);
 		}
-		qw.select("response_class,method,request_args_str,custom_response_str,access_url,class_bytes,id,bean_name,method_name,api_path,status,class_path,date_format(utime,'%Y-%m-%d %H:%i:%s') as utime,app_key,handle_type,sql_str");
+		qw.select("return_type,response_class,method,request_args_str,custom_response_str,access_url,class_bytes,id,bean_name,method_name,api_path,status,class_path,date_format(utime,'%Y-%m-%d %H:%i:%s') as utime,app_key,handle_type,sql_str");
+
 		return webApiMapper.selectList(qw);
 	}
 

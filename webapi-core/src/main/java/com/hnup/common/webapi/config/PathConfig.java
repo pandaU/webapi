@@ -30,15 +30,21 @@ public class PathConfig {
      */
     public final static String JAVA_SUFFIX=".java";
 
+	public final static String DEFAULT_JAVA_BEAN_TYPE="DTO";
+
 	public final static String DEFAULT_CLASS_NAME=".ExtClass";
+
+	public final static String DEFAULT_DTO_CLASS_NAME=".DTO";
 
 	public final static String DEFAULT_CLASS_METHOD = "action";
 
-	public final static Integer INSERT = 1;
+	public final static String INSERT = "insert";
 
-	public final static Integer UPDATE = 2;
+	public final static String UPDATE = "update";
 
-	public final static Integer SELECT = 3;
+	public final static String SELECT = "select";
 
 	public final static String URL_PREFIX = "/webapi";
+
+
 }

@@ -68,4 +68,7 @@ public class WebApiEntity extends Model<WebApiEntity> {
 
 	@TableField(value = "response_class")
 	private String responseClass;
+
+	@TableField(value = "return_type")
+	private String returnType;
 }

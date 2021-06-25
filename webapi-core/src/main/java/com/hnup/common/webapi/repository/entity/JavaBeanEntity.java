@@ -18,7 +18,7 @@ import lombok.experimental.Accessors;
 @TableName("web_bean")
 @Data
 @Accessors(chain = true)
-public class RegisterEntity extends Model<RegisterEntity> {
+public class JavaBeanEntity extends Model<JavaBeanEntity> {
 	/**
 	 * Id
 	 */

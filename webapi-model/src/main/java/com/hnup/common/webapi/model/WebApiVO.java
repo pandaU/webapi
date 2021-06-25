@@ -85,4 +85,6 @@ public class WebApiVO implements Serializable {
 	private String methodBody;
 
 	private String responseClass;
+    /**返回类型  */
+	private String returnType;
 }

@@ -1,7 +1,7 @@
 package com.hnup.common.webapi.repository.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.hnup.common.webapi.repository.entity.RegisterEntity;
+import com.hnup.common.webapi.repository.entity.JavaBeanEntity;
 
 /**
  * <p>
@@ -10,5 +10,5 @@ import com.hnup.common.webapi.repository.entity.RegisterEntity;
  * @author XieXiongXiong
  * @date 2021 -06-23
  */
-public interface RegisterMapper extends BaseMapper<RegisterEntity> {
+public interface JavaBeanMapper extends BaseMapper<JavaBeanEntity> {
 }
