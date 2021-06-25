@@ -90,10 +90,10 @@ public class WebApiController {
 		}else {
 			apiPath = ApplicationContextRegister.getEnablePrefix(defaultPackage) + "/" + apiPath;
 		}
-		List<WebApiVO> webApiVos = webApiService.list(null, null, apiPath, key);
+		List<WebApiVO> webApiVos = webApiService.list(null, webApiVo.getMethod(), apiPath, key);
 		final List<String> apiPaths = webApiVos.stream().map(WebApiVO::getAccessUrl).collect(Collectors.toList());
-		if (iocMappings.contains(apiPath) || apiPaths.contains(apiPath)){
-			throw  new DeclareException("当前apiPath被占用");
+		if (iocMappings.contains(apiPath) || iocMappings.contains(webApiVo.getMethod()+apiPath) || apiPaths.contains(apiPath)){
+			throw  new DeclareException("当前method + apiPath组合后被占用");
 		}
 		try {
 			return ResponseFactory.builder().api(webApiService.sqlApi(registerApi,sqlString,apiPath,webApiVo)).build().get();

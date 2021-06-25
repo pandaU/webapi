@@ -3,12 +3,14 @@ package com.hnup.common.webapi.service;
 import com.hnup.common.webapi.model.JavaBeanDTO;
 import com.hnup.common.webapi.repository.dao.JavaBeanDao;
 import com.hnup.common.webapi.repository.entity.JavaBeanEntity;
+import com.hnup.common.webapi.util.ClassUtil;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * <p>
@@ -42,6 +44,7 @@ public class JavaBeanService {
 		list.forEach(x->{
 			JavaBeanDTO dto = new JavaBeanDTO();
 			BeanUtils.copyProperties(x,dto);
+			dto.setFields(ClassUtil.jsonToArray(x.getFieldStr()));
 			beanDTOList.add(dto);
 		});
 		return beanDTOList;

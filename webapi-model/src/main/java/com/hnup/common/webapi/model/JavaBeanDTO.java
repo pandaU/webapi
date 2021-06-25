@@ -2,6 +2,8 @@ package com.hnup.common.webapi.model;
 
 import lombok.Data;
 
+import java.util.List;
+
 /**
  * <p>
  * The type Java bean dto.
@@ -31,4 +33,7 @@ public class JavaBeanDTO {
 	 * Class bytes
 	 */
 	private byte[] classBytes;
+
+
+	private List<CustomFieldVO> fields;
 }

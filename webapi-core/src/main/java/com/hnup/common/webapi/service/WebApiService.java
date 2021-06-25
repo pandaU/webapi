@@ -63,7 +63,8 @@ public class WebApiService implements ApplicationContextAware {
 	private ApplicationContext applicationContext;
 
     private final JavaBeanService javaBeanService;
-
+    
+    private final static ObjectMapper objectMapper = new ObjectMapper();
 
 	private static Pattern pattern = Pattern.compile("\\b(and|exec|insert|select|drop|grant|alter|delete|update|count|chr|mid|master|truncate|char|declare|or)\\b|(\\*|;|\\+|'|%)");
 
@@ -83,6 +84,9 @@ public class WebApiService implements ApplicationContextAware {
 			entity.setBeanName(javaBean.get("beanName").toString());
 			entity.setAppKey(key);
 			entity.setClassBytes((byte[]) javaBean.get("bytes"));
+			if (!StringUtils.isEmpty(webApiVo.getCustomResponse())){
+				entity.setFieldStr(objectMapper.writeValueAsString(webApiVo.getCustomResponse()));
+			}
 			entity.insert();
 		}
 		Map<String, Object> map = ClassUtil.generateSQLClass("", null, null, "com.hnup.common.webapi.service.WebApiService", null,webApiVo.getMethod());
@@ -130,6 +134,9 @@ public class WebApiService implements ApplicationContextAware {
 		entity.setBeanName(map.get("beanName").toString());
 		entity.setAppKey(key);
 		entity.setClassBytes((byte[]) map.get("bytes"));
+		if (!StringUtils.isEmpty(registerVO.getFields())){
+			entity.setFieldStr(objectMapper.writeValueAsString(registerVO.getFields()));
+		}
 		entity.insert();
 		return ResponseEntity.ok(entity);
 	}
@@ -183,11 +190,18 @@ public class WebApiService implements ApplicationContextAware {
 	public Object doService(HttpServletRequest request) throws IOException, IllegalAccessException, InstantiationException, ClassNotFoundException {
 		String uri = request.getRequestURI();
 		uri= regUrl(uri);
+		String method = request.getMethod().toLowerCase();
 		List<WebApiVO> list = list(null, null, uri , key);
 		if (CollectionUtils.isEmpty(list)) {
 			throw new DeclareException("接口不存在");
 		}
-		WebApiVO vo = list.get(0);
+		List<WebApiVO> vos = list.stream().filter(x -> {
+			return x.getMethod().equals(method);
+		}).collect(Collectors.toList());
+		if (CollectionUtils.isEmpty(vos)){
+			throw new DeclareException(method + "请求方式不支持，请使用正确的请求方式");
+		}
+		WebApiVO vo = vos.get(0);
 		String sqlStr = vo.getSqlStr();
 		String returnType = vo.getReturnType();
 		String returnClass = vo.getResponseClass();

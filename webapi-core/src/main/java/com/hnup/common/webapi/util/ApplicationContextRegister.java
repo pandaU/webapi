@@ -7,6 +7,7 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
 import org.springframework.core.annotation.AnnotationUtils;
 import org.springframework.stereotype.Component;
+import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.mvc.method.RequestMappingInfo;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
@@ -59,13 +60,8 @@ public class ApplicationContextRegister implements ApplicationContextAware {
 		Map<RequestMappingInfo, HandlerMethod> map = mapping
 			.getHandlerMethods();
 		for (RequestMappingInfo info : map.keySet()) {
-			// 获取url的Set集合，一个方法可能对应多个url
-			Set<String> patterns = info.getPatternsCondition().getPatterns();
-			for (String url : patterns) {
-				//把结果存入静态变量中程序运行一次次方法之后就不用再次请求次方法
-				urls.add(url);
+				urls.add(info.toString().replace("{","").replace("}","").replace(" ","").toLowerCase());
 			}
-		}
 		return urls;
 	}
 

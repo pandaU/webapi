@@ -40,4 +40,7 @@ public class JavaBeanEntity extends Model<JavaBeanEntity> {
 
 	@TableField(value = "class_bytes")
 	private byte[] classBytes;
+
+	@TableField(value = "fields")
+	private String fieldStr;
 }
