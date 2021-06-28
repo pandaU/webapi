@@ -2,6 +2,7 @@ package com.hnup.common.webapi.model;
 
 import lombok.Data;
 
+import java.io.Serializable;
 import java.util.List;
 
 /**
@@ -12,7 +13,8 @@ import java.util.List;
  * @date 2021 -06-25
  */
 @Data
-public class JavaBeanDTO {
+public class JavaBeanDTO implements Serializable {
+	private static final long serialVersionUID = 4488941396856441132L;
 	/**
 	 * Id
 	 */

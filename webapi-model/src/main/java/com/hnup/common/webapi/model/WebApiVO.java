@@ -13,52 +13,23 @@ import java.util.List;
  * @date 2021 -06-18
  */
 @Data
-public class WebApiVO implements Serializable {
+public class WebApiVO {
 
-
-	private static final long serialVersionUID = -7186810976714599270L;
-	/**
-	 * Id
-	 */
 	private Long id;
 
-	/**
-	 * App key
-	 */
 	private String appKey;
 
-	/**
-	 * Bean name
-	 */
 	private String beanName;
 
-	/**
-	 * Api path
-	 */
 	private String apiPath;
 
-	/**
-	 * Method name
-	 */
 	private String methodName;
 
-	/**
-	 * Class path
-	 */
 	private String classPath;
 
-	/**
-	 * Status
-	 */
 	private Integer  status;
 
-	/**
-	 * Utime
-	 */
 	private String  utime;
-	/**
-	 * sqlStr
-	 */
 
 	private String  sqlStr;
 
@@ -83,7 +54,7 @@ public class WebApiVO implements Serializable {
 	private String argsType;
 
 	private String methodBody;
-
+    /**定义的返回类型*/
 	private String responseClass;
     /**返回类型  */
 	private String returnType;

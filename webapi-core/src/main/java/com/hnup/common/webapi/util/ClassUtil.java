@@ -251,14 +251,12 @@ public class ClassUtil {
 
 	public static Map<String, Object> generateJavaBean(String beanName, List<CustomFieldVO> fields, List<CustomMethodVO> extraMethods) throws IOException, CannotCompileException, NotFoundException {
 		Map<String, CtClass> ctClass = classMap;
-		String destName = defaultPackage + beanName;
+		String destName = defaultPackage + "." + beanName;
 		ClassLoader loader = pool.getClassLoader();
 		try {
 			//切换classLoad
 			Thread.currentThread().setContextClassLoader(WebApiClassLoader.loader);
 			CtClass clazz = pool.makeClass(destName);
-			ClassFile ccFile = clazz.getClassFile();
-			ConstPool constpool = ccFile.getConstPool();
 			clazz.setSuperclass(pool.get("java.lang.Object"));
 			fields.forEach((x) -> {
 				String name = x.getFieldName();

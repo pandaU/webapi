@@ -119,7 +119,6 @@ public class WebApiController {
 		try {
 			return webApiService.javaBean(beanName,registerVO);
 		} catch (Exception e) {
-			e.printStackTrace();
 		}
 		throw new DeclareException("注册bean失败");
 	}
